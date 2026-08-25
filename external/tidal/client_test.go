@@ -116,9 +116,24 @@ func TestUserPlaylistsRespectsPageCap(t *testing.T) {
 			"totalNumberOfItems": total,
 		})
 	}))
+  
+func TestSearchAlbums(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search/albums" {
+			t.Errorf("path = %q, want /search/albums", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("query"); got != "query" {
+			t.Errorf("query param = %q, want query", got)
+		}
+		if got := r.URL.Query().Get("limit"); got != "10" {
+			t.Errorf("limit param = %q, want 10", got)
+		}
+		fmt.Fprint(w, `{"items": [{"id": 1, "title": "A", "artist": {"id": 2, "name": "Artist"}}]}`)
+	}))
 	defer srv.Close()
 
 	c := testClient(srv)
+
 	playlists, err := c.userPlaylists(context.Background())
 	if err != nil {
 		t.Fatalf("userPlaylists: %v", err)
@@ -128,6 +143,18 @@ func TestUserPlaylistsRespectsPageCap(t *testing.T) {
 	}
 	if playlists[0].Title != "playlist-0" || playlists[total-1].Title != "playlist-119" {
 		t.Errorf("unexpected boundary items: %q, %q", playlists[0].Title, playlists[total-1].Title)
+  }
+  
+	albums, err := c.searchAlbums(context.Background(), "query", 10)
+	if err != nil {
+		t.Fatalf("searchAlbums: %v", err)
+	}
+	if len(albums) != 1 {
+		t.Fatalf("got %d albums, want 1", len(albums))
+	}
+	a := albums[0]
+	if a.ID.String() != "1" || a.Title != "A" || a.Artist.Name != "Artist" {
+		t.Errorf("album = %+v", a)
 	}
 }
 
